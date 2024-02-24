@@ -65,8 +65,7 @@ class WhimsicalToRealWallet:
             print(f"API request failed with status {response.status_code}: {response.text}")
             
             # Extract relevant info (e.g., account ID, balance, etc.)
-        account_id = data["data"][0]["id"]
-        account_balance = data["data"][0]["balance"]["amount"]
+      
         
 
             # Simulate sending funds (replace with actual logic)
