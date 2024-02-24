@@ -57,6 +57,10 @@ class WhimsicalToRealWallet:
             # Make a GET request to retrieve account info
         import requests
 
+        # Extract relevant info (e.g., account ID, balance, etc.)
+        account_id = data["data"][0]["id"]
+        account_balance = data["data"][0]["balance"]["amount"]
+
         response = requests.get(url, headers=headers)
 
         if response.ok:
@@ -64,9 +68,7 @@ class WhimsicalToRealWallet:
         else:
             print(f"API request failed with status {response.status_code}: {response.text}")
             
-            # Extract relevant info (e.g., account ID, balance, etc.)
-        account_id = data["data"][0]["id"]
-        account_balance = data["data"][0]["balance"]["amount"]
+            
         
 
             # Simulate sending funds (replace with actual logic)
