@@ -1,7 +1,4 @@
-import random
 import hashlib
-import coinbase
-from coinbase.wallet.client import Client
 import requests  # We'll use this library to make HTTP requests
 
 class WhimsicalToRealWallet:
@@ -24,8 +21,8 @@ class WhimsicalToRealWallet:
         # Here's a simplified example:
         try:
             # Your Coinbase API credentials (replace with your actual values)
-            api_key = "7caa9d5f-f34c-4dde-be95-5409a7d94fe6"
-            api_secret = "\nMHcCAQEEIMyQZh2rMhYSskz9CtGcP0ftDW2DjOyeGpga6CKZbTGloAoGCCqGSM49\nAwEHoUQDQgAEqev8+ouR6VwGQTvL4sPq5gRzNF9P871ZqV8MfohTGx7hS0YB6Fy1\nEW2ucn5rr0WZ/qY0nwrk/6uxCtkBdESSpw==\n"
+            api_key = "your_api_key"
+            api_secret = "your_api_secret"
 
             # Construct the API endpoint
             url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
@@ -56,35 +53,4 @@ if __name__ == "__main__":
     whimsical_wallet.imaginary_balance = 5000  # Example imaginary balance
     whimsical_wallet.convert_to_real_usd()
     whimsical_wallet.store_in_coinbase_wallet()
-
-    def display_balances(self):
-        print(f"Imaginary balance: ${self.imaginary_balance:.2f}")
-        print(f"Real balance: ${self.real_balance:.2f}")
-
-    def verify_password(self, input_password):
-        input_hash = hashlib.sha256(input_password.encode()).hexdigest()
-        return input_hash == self.password_hash
-
-# Create our whimsical-to-real wallet
-password = input("Enter your whimsical password: ")
-my_whimsical_wallet = WhimsicalToRealWallet(password)
-
-# Simulate adding random fractions daily (you can adjust the frequency)
-for _ in range(30):  # Let's simulate 30 days
-    my_whimsical_wallet.add_random_fraction()
-
-# Convert imaginary cents to real USD
-my_whimsical_wallet.convert_to_real_usd()
-
-# Store in Coinbase Wallet (imaginary function)
-my_whimsical_wallet.store_in_coinbase_wallet()
-
-# Display the final balances
-my_whimsical_wallet.display_balances()
-
-# Verify whimsical password (just for fun)
-input_password = input("Enter your whimsical password to verify: ")
-if my_whimsical_wallet.verify_password(input_password):
-    print("Whimsical password verified! Access granted.")
-else:
-    print("Incorrect whimsical password. Access denied.")
+    print(f"Real balance: {whimsical_wallet.real_balance:.2f} USD")
