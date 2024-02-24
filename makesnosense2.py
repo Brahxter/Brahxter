@@ -1,9 +1,6 @@
 import random
 import hashlib
 from coinbase.wallet.client import Client
-import hashlib
-import random
-from coinbase.wallet.client import Client
 import requests
 
 class WhimsicalToRealWallet:
