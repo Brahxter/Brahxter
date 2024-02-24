@@ -44,9 +44,7 @@ class WhimsicalToRealWallet:
             # Construct the API endpoint
         url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
 
-        client = Client(api_key, api_secret)
-
-        user = client.get_current_user()
+        
 
             # Create a request with authentication headers
         headers = {
@@ -55,14 +53,8 @@ class WhimsicalToRealWallet:
             }
 
             # Make a GET request to retrieve account info
-        import requests
-
         response = requests.get(url, headers=headers)
-
-        if response.ok:
-            data = response.json()
-        else:
-            print(f"API request failed with status {response.status_code}: {response.text}")
+        data = response.json()
             
             # Extract relevant info (e.g., account ID, balance, etc.)
         account_id = data["data"][0]["id"]
