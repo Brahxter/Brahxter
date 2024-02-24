@@ -47,8 +47,9 @@ class WhimsicalToRealWallet:
 
         # Create a request with authentication headers
         headers = {
-            "Authorization": f"Bearer {api_key}",
-            "CB-VERSION": "2021-03-05",  # API version
+            'CB-ACCESS-KEY': api_key,
+            'CB-ACCESS-SIGN': api_secret,
+                'CB-VERSION': '2021-03-05',  # Coinbase API version
         }
 
         # Make a GET request to retrieve account info
