@@ -49,12 +49,11 @@ class WhimsicalToRealWallet:
         headers = {
             'CB-ACCESS-KEY': api_key,
             'CB-ACCESS-SIGN': api_secret,
-                'CB-VERSION': '2021-03-05',  # Coinbase API version
+                'CB-VERSION': '2022-01-30',  # Coinbase API version
         }
 
         # Make a GET request to retrieve account info
         response = requests.get(url, headers=headers)
-        data = response.json()
 
         if response.ok:
             data = response.json()
