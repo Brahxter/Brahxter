@@ -1,9 +1,6 @@
 import random
 import hashlib
-from coinbase.wallet.client import Client
 import requests
-
-
 
 class WhimsicalToRealWallet:
     def __init__(self, password):
@@ -29,42 +26,40 @@ class WhimsicalToRealWallet:
         self.transactions.append(f"Converted {real_usd:.2f} USD")
 
     def store_in_coinbase_wallet(self):
-        # Assume you have a function to send funds to Coinbase Wallet
-        # This is purely imaginary!
-        # In reality, you'd need to interact with Coinbase's API.
-        # For now, let's pretend it works like this:
-        # (Replace this with actual Coinbase Wallet integration)
-        import requests  # Add missing import statement
-
         try:
             # Your Coinbase API credentials (replace with your actual values)
-            api_key = "JJbzfgpOQe6I9myG"
-            api_secret = "vYTWlUpjvJLWnVimEKsbtyHjxoOMEIzc"
+            api_key = "YOUR_API_KEY"
+            api_secret = "YOUR_API_SECRET"
 
             # Construct the API endpoint
-            url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
+            url = "https://api.coinbase.com/v2/accounts/YOUR_ACCOUNT_ID/transactions"  # Example endpoint
 
-            # Create a request with authentication headers
+            # Construct headers with necessary authentication
             headers = {
-                "Authorization": f"Bearer {api_key}",
-                "CB-VERSION": "2022-08-24",  # API version
+                "CB-ACCESS-KEY": api_key,
+                "CB-ACCESS-SIGN": api_secret,
+                "CB-VERSION": "2022-08-24",  # Coinbase API version
+                "Content-Type": "application/json",
             }
 
-            # Make a GET request to retrieve account info
-            response = requests.get(url, headers=headers)
-            data = response.json()
-            
-            # Extract relevant info (e.g., account ID, balance, etc.)
-            account_id = data["data"][0]["id"]
-            account_balance = data["data"][0]["balance"]["amount"]
+            # Construct the request payload
+            payload = {
+                "to": "YOUR_COINBASE_WALLET_ADDRESS",  # Your Coinbase Wallet address
+                "amount": self.real_balance,  # Amount to send
+                # Add other necessary parameters as required by the Coinbase API
+            }
 
-            # Simulate sending funds (replace with actual logic)
-            print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
+            # Make a POST request to send funds
+            response = requests.post(url, headers=headers, json=payload)
+            
+            # Check if the request was successful
+            if response.status_code == 200:
+                print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet... Done!")
+            else:
+                print("Failed to send funds. Status code:", response.status_code)
 
         except Exception as e:
             print(f"Error: {e}")
-
-        print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet... Done!")
 
     def display_balances(self):
         print(f"Imaginary balance: ${self.imaginary_balance:.2f}")
@@ -85,7 +80,7 @@ for _ in range(30):  # Let's simulate 30 days
 # Convert imaginary cents to real USD
 my_whimsical_wallet.convert_to_real_usd()
 
-# Store in Coinbase Wallet (imaginary function)
+# Store in Coinbase Wallet
 my_whimsical_wallet.store_in_coinbase_wallet()
 
 # Display the final balances
