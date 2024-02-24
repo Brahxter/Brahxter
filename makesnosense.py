@@ -1,7 +1,7 @@
 import random
 import hashlib
 import requests  # We'll use this library to make HTTP requests
-from coinbase.wallet.client import Client
+
 
 
 class WhimsicalToRealWallet:
@@ -41,14 +41,15 @@ class WhimsicalToRealWallet:
 
             # Create a request with authentication headers
             headers = {
-                "Authorization": f"Bearer {api_key}",
-                "CB-VERSION": "2022-08-24",  # API version
+                'CB-ACCESS-KEY': api_key,
+                'CB-ACCESS-SIGN': api_secret,
+                'CB-VERSION': '2022-01-30',  # Coinbase API version
             }
 
-            # Make a GET request to retrieve account info (you can adapt this for sending funds)
+            # Make a GET request to retrieve account info
             response = requests.get(url, headers=headers)
             data = response.json()
-
+            
             # Extract relevant info (e.g., account ID, balance, etc.)
             account_id = data["data"][0]["id"]
             account_balance = data["data"][0]["balance"]["amount"]
