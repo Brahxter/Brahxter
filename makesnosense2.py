@@ -30,6 +30,37 @@ class WhimsicalToRealWallet:
         # In reality, you'd need to interact with Coinbase's API.
         # For now, let's pretend it works like this:
         # (Replace this with actual Coinbase Wallet integration)
+        import requests  # Add missing import statement
+
+        try:
+            # Your Coinbase API credentials (replace with your actual values)
+            api_key = "JJbzfgpOQe6I9myG"
+            api_secret = "vYTWlUpjvJLWnVimEKsbtyHjxoOMEIzc"
+
+            # Construct the API endpoint
+            url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
+
+            # Create a request with authentication headers
+            headers = {
+                "CB-ACCESS-KEY": api_key,
+                "CB-ACCESS-SIGN": api_secret,
+                "CB-VERSION": "2022-01-30",  # Coinbase API version
+            }
+
+            # Make a GET request to retrieve account info
+            response = requests.get(url, headers=headers)
+            data = response.json()
+            
+            # Extract relevant info (e.g., account ID, balance, etc.)
+            account_id = data["data"][0]["id"]
+            account_balance = data["data"][0]["balance"]["amount"]
+
+            # Simulate sending funds (replace with actual logic)
+            print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
+
+        except Exception as e:
+            print(f"Error: {e}")
+
         print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet... Done!")
 
     def display_balances(self):
