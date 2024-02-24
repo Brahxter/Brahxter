@@ -1,4 +1,4 @@
-
+from coinbase.wallet.client import Client
 import requests
 import hashlib  # For password hashing
 
