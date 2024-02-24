@@ -1,6 +1,7 @@
 import random
 import hashlib
 
+
 class WhimsicalToRealWallet:
     def __init__(self, password):
         self.password_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -42,9 +43,8 @@ class WhimsicalToRealWallet:
 
             # Create a request with authentication headers
             headers = {
-                "CB-ACCESS-KEY": api_key,
-                "CB-ACCESS-SIGN": api_secret,
-                "CB-VERSION": "2022-01-30",  # Coinbase API version
+                "Authorization": f"Bearer {api_key}",
+                "CB-VERSION": "2022-08-24",  # API version
             }
 
             # Make a GET request to retrieve account info
