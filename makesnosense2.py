@@ -1,5 +1,8 @@
 import random
 import hashlib
+from coinbase.wallet.client import Client
+import requests
+
 
 
 class WhimsicalToRealWallet:
@@ -33,32 +36,36 @@ class WhimsicalToRealWallet:
         # (Replace this with actual Coinbase Wallet integration)
         import requests  # Add missing import statement
 
-        try:
-            # Your Coinbase API credentials (replace with your actual values)
-            api_key = "JJbzfgpOQe6I9myG"
-            api_secret = "vYTWlUpjvJLWnVimEKsbtyHjxoOMEIzc"
+        
+        # Your Coinbase API credentials (replace with your actual values)
+        api_key = "JJbzfgpOQe6I9myG"
+        api_secret = "vYTWlUpjvJLWnVimEKsbtyHjxoOMEIzc"
 
             # Construct the API endpoint
-            url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
+        url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
+
+        client = Client(api_key, api_secret)
+
+        user = client.get_current_user()
 
             # Create a request with authentication headers
-            client = Client(api_key, api_secret)
-
-            user = client.get_current_user()
+        headers = {
+                "Authorization": f"Bearer {api_key}",
+                "CB-VERSION": "2022-08-24",  # API version
+            }
 
             # Make a GET request to retrieve account info
-            response = requests.get(url, headers=headers)
-            data = response.json()
+        response = requests.get(url, headers=headers)
+        data = response.json()
             
             # Extract relevant info (e.g., account ID, balance, etc.)
-            account_id = data["data"][0]["id"]
-            account_balance = data["data"][0]["balance"]["amount"]
+        account_id = data["data"][0]["id"]
+        account_balance = data["data"][0]["balance"]["amount"]
 
             # Simulate sending funds (replace with actual logic)
-            print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
+        print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
 
-        except Exception as e:
-            print(f"Error: {e}")
+        
 
         print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet... Done!")
 
