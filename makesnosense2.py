@@ -1,6 +1,9 @@
 import random
 import hashlib
 from coinbase.wallet.client import Client
+import hashlib
+import random
+from coinbase.wallet.client import Client
 import requests
 
 class WhimsicalToRealWallet:
@@ -44,9 +47,8 @@ class WhimsicalToRealWallet:
 
         # Create a request with authentication headers
         headers = {
-            'CB-ACCESS-KEY': api_key,
-            'CB-ACCESS-SIGN': api_secret,
-                'CB-VERSION': '2022-01-30',  # Coinbase API version
+            "Authorization": f"Bearer {api_key}",
+            "CB-VERSION": "2021-03-05",  # API version
         }
 
         # Make a GET request to retrieve account info
