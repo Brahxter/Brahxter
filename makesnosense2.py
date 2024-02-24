@@ -32,7 +32,7 @@ class WhimsicalToRealWallet:
             api_secret = "vYTWlUpjvJLWnVimEKsbtyHjxoOMEIzc"
 
             # Construct the API endpoint
-            url = "https://api.coinbase.com/v2/accounts/YOUR_ACCOUNT_ID/transactions"  # Example endpoint
+            url = "https://api.coinbase.com/v2/accounts/Brock Williams/transactions"  # Example endpoint
 
             # Construct headers with necessary authentication
             headers = {
