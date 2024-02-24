@@ -1,5 +1,7 @@
 import hashlib
 import requests  # We'll use this library to make HTTP requests
+from coinbase.wallet.client import Client
+
 
 class WhimsicalToRealWallet:
     def __init__(self, password):
