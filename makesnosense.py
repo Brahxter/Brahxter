@@ -44,47 +44,71 @@ class WhimsicalToRealWallet:
             account_balance = data["data"][0]["balance"]["amount"]
 
             # Simulate sending funds (replace with actual logic)
-            print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
-
+            # Define the endpoint for withdrawal
         except Exception as e:
             print(f"Error: {e}")
+            pass
+api_key = "your_api_key"  # Replace "your_api_key" with your actual API key
 
+url = 'https://api.coinbase.com/v2/accounts/your_account_id/withdrawals'
 
-    def display_balances(self):
-        print(f"Imaginary balance: ${self.imaginary_balance:.2f}")
-        print(f"Real balance: ${self.real_balance:.2f}")
+# Set headers (include your API key)
+headers = {
+    'Content-Type': 'application/json',
+    'Authorization': f'Bearer {api_key}'
+}
 
-    def verify_password(self, input_password):
-        input_hash = hashlib.sha256(input_password.encode()).hexdigest()
-        return input_hash == self.password_hash
+# Define withdrawal parameters (replace with actual values)
+withdrawal_data = {
+    'amount': 100.0,  # Amount to withdraw (in USD or other currency)
+    'currency': 'USD',  # Currency (e.g., USD, BTC, ETH)
+    'payment_method': 'your_payment_method_id'  # Add a payment method in your Coinbase account
+}
 
-# Create our whimsical-to-real wallet
-password = input("Enter your whimsical password: ")
-my_whimsical_wallet = WhimsicalToRealWallet(password)
+try:
+    response = requests.post(url, json=withdrawal_data, headers=headers)
+    if response.status_code == 201:
+        print(f"Funds successfully sent to your Coinbase Wallet (Account ID: Brock Williams)")
+    else:
+        print(f"Error sending funds: {response.json()}")
+except Exception as e:
+    print(f"Error: {e}")
+    pass
+def display_balances(self):
+    print(f"Imaginary balance: ${self.imaginary_balance:.2f}")
+    print(f"Real balance: ${self.real_balance:.2f}")
 
-# Simulate adding random fractions daily (you can adjust the frequency)
-for _ in range(30):  # Let's simulate 30 days
-    my_whimsical_wallet.add_random_fraction()
+def verify_password(self, input_password):
+    input_hash = hashlib.sha256(input_password.encode()).hexdigest()
+    return input_hash == self.password_hash
 
-# Convert imaginary cents to real USD
-my_whimsical_wallet.convert_to_real_usd()
+    # Create our whimsical-to-real wallet
+    password = input("Enter your whimsical password: ")
+    my_whimsical_wallet = WhimsicalToRealWallet(password)
 
-# Store in Coinbase Wallet (imaginary function)
-my_whimsical_wallet.store_in_coinbase_wallet()
+    # Simulate adding random fractions daily (you can adjust the frequency)
+    for _ in range(30):  # Let's simulate 30 days
+        my_whimsical_wallet.add_random_fraction()
 
-# Display the final balances
-my_whimsical_wallet.display_balances()
+    # Convert imaginary cents to real USD
+    my_whimsical_wallet.convert_to_real_usd()
 
-# Verify whimsical password (just for fun)
-input_password = input("Enter your whimsical password to verify: ")
-if my_whimsical_wallet.verify_password(input_password):
-    print("Whimsical password verified! Access granted.")
-else:
-    print("Incorrect whimsical password. Access denied.") 
-    
-# Example usage
-if __name__ == "__main__":
-    whimsical_wallet = WhimsicalToRealWallet("your_password")
-    whimsical_wallet.imaginary_balance = 5000  # Example imaginary balance
-    whimsical_wallet.convert_to_real_usd()
-    whimsical_wallet.store_in_coinbase_wallet()
+    # Store in Coinbase Wallet (imaginary function)
+    my_whimsical_wallet.store_in_coinbase_wallet()
+
+    # Display the final balances
+    my_whimsical_wallet.display_balances()
+
+    # Verify whimsical password (just for fun)
+    input_password = input("Enter your whimsical password to verify: ")
+    if my_whimsical_wallet.verify_password(input_password):
+        print("Whimsical password verified! Access granted.")
+    else:
+        print("Incorrect whimsical password. Access denied.") 
+        
+    # Example usage
+    if __name__ == "__main__":
+        whimsical_wallet = WhimsicalToRealWallet("your_password")
+        whimsical_wallet.imaginary_balance = 5000  # Example imaginary balance
+        whimsical_wallet.convert_to_real_usd()
+        whimsical_wallet.store_in_coinbase_wallet()
