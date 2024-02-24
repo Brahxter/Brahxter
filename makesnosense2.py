@@ -28,8 +28,8 @@ class WhimsicalToRealWallet:
     def store_in_coinbase_wallet(self):
         try:
             # Your Coinbase API credentials (replace with your actual values)
-            api_key = "YOUR_API_KEY"
-            api_secret = "YOUR_API_SECRET"
+            api_key = "JJbzfgpOQe6I9myG"
+            api_secret = "vYTWlUpjvJLWnVimEKsbtyHjxoOMEIzc"
 
             # Construct the API endpoint
             url = "https://api.coinbase.com/v2/accounts/YOUR_ACCOUNT_ID/transactions"  # Example endpoint
@@ -44,7 +44,7 @@ class WhimsicalToRealWallet:
 
             # Construct the request payload
             payload = {
-                "to": "YOUR_COINBASE_WALLET_ADDRESS",  # Your Coinbase Wallet address
+                "to": "55faca9444d8c9cb207e96a7f389a71ef2b81e9baf2586996548f468488c7fdc",  # Your Coinbase Wallet address
                 "amount": self.real_balance,  # Amount to send
                 # Add other necessary parameters as required by the Coinbase API
             }
