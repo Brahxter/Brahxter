@@ -1,10 +1,9 @@
 import random
 import hashlib
 from coinbase.wallet.client import Client
-import hashlib
-import random
-from coinbase.wallet.client import Client
 import requests
+
+
 
 class WhimsicalToRealWallet:
     def __init__(self, password):
@@ -35,32 +34,32 @@ class WhimsicalToRealWallet:
         # In reality, you'd need to interact with Coinbase's API.
         # For now, let's pretend it works like this:
         # (Replace this with actual Coinbase Wallet integration)
+        import requests  # Add missing import statement
+
         
         # Your Coinbase API credentials (replace with your actual values)
         api_key = "JJbzfgpOQe6I9myG"
         api_secret = "vYTWlUpjvJLWnVimEKsbtyHjxoOMEIzc"
 
-        # Construct the API endpoint
+            # Construct the API endpoint
         url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
 
         client = Client(api_key, api_secret)
 
-        # Create a request with authentication headers
+        user = client.get_current_user()
+
+            # Create a request with authentication headers
         headers = {
-            "Authorization": f"Bearer {api_key}",
-            "CB-VERSION": "2022-08-24",  # API version
-        }
+                "Authorization": f"Bearer {api_key}",
+                "CB-VERSION": "2022-08-24",  # API version
+            }
 
-        # Make a GET request to retrieve account info
-        response = requests.get(url, headers=headers)
+            # Make a GET request to retrieve account info
+        import requests
 
-        if response.ok:
-            data = response.json()
-            # Extract relevant info (e.g., account ID, balance, etc.)
-            account_id = data["data"][0]["id"]
-            account_balance = data["data"][0]["balance"]["amount"]
-        else:
-            print(f"API request failed with status {response.status_code}: {response.text}")
+        # Extract relevant info (e.g., account ID, balance, etc.)
+        account_id = data["data"][0]["id"]
+        account_balance = data["data"][0]["balance"]["amount"]
 
         response = requests.get(url, headers=headers)
 
