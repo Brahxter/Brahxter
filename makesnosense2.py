@@ -48,7 +48,7 @@ class WhimsicalToRealWallet:
         # Create a request with authentication headers
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "CB-VERSION": "2022-08-24",  # API version
+            "CB-VERSION": "2021-03-05",  # API version
         }
 
         # Make a GET request to retrieve account info
