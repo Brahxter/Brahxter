@@ -1,7 +1,5 @@
 import hashlib
 import requests  # We'll use this library to make HTTP requests
-import coinbase  # We'll use this library to interact with Coinbase's API
-
 
 class WhimsicalToRealWallet:
     def __init__(self, password):
@@ -24,7 +22,7 @@ class WhimsicalToRealWallet:
         try:
             # Your Coinbase API credentials (replace with your actual values)
             api_key = "7caa9d5f-f34c-4dde-be95-5409a7d94fe6"
-            api_secret = "MHcCAQEEIMyQZh2rMhYSskz9CtGcP0ftDW2DjOyeGpga6CKZbTGloAoGCCqGSM49"
+            api_secret = "\nMHcCAQEEIMyQZh2rMhYSskz9CtGcP0ftDW2DjOyeGpga6CKZbTGloAoGCCqGSM49\n"
 
             # Construct the API endpoint
             url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
@@ -55,4 +53,3 @@ if __name__ == "__main__":
     whimsical_wallet.imaginary_balance = 5000  # Example imaginary balance
     whimsical_wallet.convert_to_real_usd()
     whimsical_wallet.store_in_coinbase_wallet()
-    print(f"Real balance: {whimsical_wallet.real_balance:.2f} USD")
