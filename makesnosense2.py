@@ -42,10 +42,9 @@ class WhimsicalToRealWallet:
             url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
 
             # Create a request with authentication headers
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "CB-VERSION": "2022-08-24",  # API version
-            }
+            client = Client(api_key, api_secret)
+
+            user = client.get_current_user()
 
             # Make a GET request to retrieve account info
             response = requests.get(url, headers=headers)
