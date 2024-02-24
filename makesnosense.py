@@ -1,8 +1,7 @@
 import random
 import hashlib
 import coinbase
-
-import hashlib
+from coinbase.wallet.client import Client
 import requests  # We'll use this library to make HTTP requests
 
 class WhimsicalToRealWallet:
