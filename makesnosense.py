@@ -1,3 +1,4 @@
+import random
 import hashlib
 import requests  # We'll use this library to make HTTP requests
 from coinbase.wallet.client import Client
@@ -9,6 +10,15 @@ class WhimsicalToRealWallet:
         self.imaginary_balance = 0.0
         self.real_balance = 0.0
         self.transactions = []
+
+    def add_random_fraction(self):
+        # Generate a random fraction between 0 and 1 (exclusive)
+        fraction = random.random()
+        # Convert to cents (multiply by 100)
+        cents = fraction * 100
+        # Add to the imaginary balance
+        self.imaginary_balance += cents
+        self.transactions.append(f"Added {cents:.2f} imaginary cents")
 
     def convert_to_real_usd(self):
         # Convert cents to real USD (divide by 100)
