@@ -64,12 +64,21 @@ class WhimsicalToRealWallet:
         else:
             print(f"API request failed with status {response.status_code}: {response.text}")
 
+        response = requests.get(url, headers=headers)
+
+        if response.ok:
+            data = response.json()
+        else:
+            print(f"API request failed with status {response.status_code}: {response.text}")
+            
+            
+        
 
             # Simulate sending funds (replace with actual logic)
         print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
 
         
-                # Simulate sending funds (replace with actual logic)
+
         print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet... Done!")
 
     def display_balances(self):
