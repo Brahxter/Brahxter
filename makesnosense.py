@@ -44,34 +44,10 @@ class WhimsicalToRealWallet:
             account_balance = data["data"][0]["balance"]["amount"]
 
             # Simulate sending funds (replace with actual logic)
-            # Define the endpoint for withdrawal
-api_key = "your_api_key"  # Replace "your_api_key" with your actual API key
+            print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
 
-url = 'https://api.coinbase.com/v2/accounts/your_account_id/withdrawals'
-
-# Set headers (include your API key)
-headers = {
-    'Content-Type': 'application/json',
-    'Authorization': f'Bearer {api_key}'
-}
-
-# Define withdrawal parameters (replace with actual values)
-withdrawal_data = {
-    'amount': 100.0,  # Amount to withdraw (in USD or other currency)
-    'currency': 'USD',  # Currency (e.g., USD, BTC, ETH)
-    'payment_method': 'your_payment_method_id'  # Add a payment method in your Coinbase account
-}
-
-try:
-    response = requests.post(url, json=withdrawal_data, headers=headers)
-    if response.status_code == 201:
-        print(f"Funds successfully sent to your Coinbase Wallet (Account ID: {account_id})")
-    else:
-        print(f"Error sending funds: {response.json()}")
-except Exception as e:
-    print(f"Error: {e}")
-    pass
-print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
+        except Exception as e:
+            print(f"Error: {e}")
 
 
     def display_balances(self):
@@ -82,33 +58,33 @@ print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID:
         input_hash = hashlib.sha256(input_password.encode()).hexdigest()
         return input_hash == self.password_hash
 
-    # Create our whimsical-to-real wallet
-    password = input("Enter your whimsical password: ")
-    my_whimsical_wallet = WhimsicalToRealWallet(password)
+# Create our whimsical-to-real wallet
+password = input("Enter your whimsical password: ")
+my_whimsical_wallet = WhimsicalToRealWallet(password)
 
-    # Simulate adding random fractions daily (you can adjust the frequency)
-    for _ in range(30):  # Let's simulate 30 days
-        my_whimsical_wallet.add_random_fraction()
+# Simulate adding random fractions daily (you can adjust the frequency)
+for _ in range(30):  # Let's simulate 30 days
+    my_whimsical_wallet.add_random_fraction()
 
-    # Convert imaginary cents to real USD
-    my_whimsical_wallet.convert_to_real_usd()
+# Convert imaginary cents to real USD
+my_whimsical_wallet.convert_to_real_usd()
 
-    # Store in Coinbase Wallet (imaginary function)
-    my_whimsical_wallet.store_in_coinbase_wallet()
+# Store in Coinbase Wallet (imaginary function)
+my_whimsical_wallet.store_in_coinbase_wallet()
 
-    # Display the final balances
-    my_whimsical_wallet.display_balances()
+# Display the final balances
+my_whimsical_wallet.display_balances()
 
-    # Verify whimsical password (just for fun)
-    input_password = input("Enter your whimsical password to verify: ")
-    if my_whimsical_wallet.verify_password(input_password):
-        print("Whimsical password verified! Access granted.")
-    else:
-        print("Incorrect whimsical password. Access denied.") 
-        
-    # Example usage
-    if __name__ == "__main__":
-        whimsical_wallet = WhimsicalToRealWallet("your_password")
-        whimsical_wallet.imaginary_balance = 5000  # Example imaginary balance
-        whimsical_wallet.convert_to_real_usd()
-        whimsical_wallet.store_in_coinbase_wallet()
+# Verify whimsical password (just for fun)
+input_password = input("Enter your whimsical password to verify: ")
+if my_whimsical_wallet.verify_password(input_password):
+    print("Whimsical password verified! Access granted.")
+else:
+    print("Incorrect whimsical password. Access denied.") 
+    
+# Example usage
+if __name__ == "__main__":
+    whimsical_wallet = WhimsicalToRealWallet("your_password")
+    whimsical_wallet.imaginary_balance = 5000  # Example imaginary balance
+    whimsical_wallet.convert_to_real_usd()
+    whimsical_wallet.store_in_coinbase_wallet()
