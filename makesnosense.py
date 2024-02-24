@@ -23,8 +23,8 @@ class WhimsicalToRealWallet:
         # Here's a simplified example:
         try:
             # Your Coinbase API credentials (replace with your actual values)
-            api_key = "JJbzfgpOQe6I9myG"
-            api_secret = "vYTWlUpjvJLWnVimEKsbtyHjxoOMEIzc"
+            api_key = "organizations/3c0f8e2c-50c2-462a-b0fb-ff02e8b45331/apiKeys/7caa9d5f-f34c-4dde-be95-5409a7d94fe6"
+            api_secret = "\nMHcCAQEEIMyQZh2rMhYSskz9CtGcP0ftDW2DjOyeGpga6CKZbTGloAoGCCqGSM49\nAwEHoUQDQgAEqev8+ouR6VwGQTvL4sPq5gRzNF9P871ZqV8MfohTGx7hS0YB6Fy1\nEW2ucn5rr0WZ/qY0nwrk/6uxCtkBdESSpw==\n"
 
             # Construct the API endpoint
             url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
@@ -45,9 +45,6 @@ class WhimsicalToRealWallet:
 
             # Simulate sending funds (replace with actual logic)
             # Define the endpoint for withdrawal
-        except Exception as e:
-            print(f"Error: {e}")
-            pass
 api_key = "your_api_key"  # Replace "your_api_key" with your actual API key
 
 url = 'https://api.coinbase.com/v2/accounts/your_account_id/withdrawals'
@@ -60,7 +57,7 @@ headers = {
 
 # Define withdrawal parameters (replace with actual values)
 withdrawal_data = {
-    'amount': 50.00,  # Amount to withdraw (in USD or other currency)
+    'amount': 100.0,  # Amount to withdraw (in USD or other currency)
     'currency': 'USD',  # Currency (e.g., USD, BTC, ETH)
     'payment_method': 'your_payment_method_id'  # Add a payment method in your Coinbase account
 }
@@ -68,19 +65,22 @@ withdrawal_data = {
 try:
     response = requests.post(url, json=withdrawal_data, headers=headers)
     if response.status_code == 201:
-        print(f"Funds successfully sent to your Coinbase Wallet (Account ID: Brock Williams)")
+        print(f"Funds successfully sent to your Coinbase Wallet (Account ID: {account_id})")
     else:
         print(f"Error sending funds: {response.json()}")
 except Exception as e:
     print(f"Error: {e}")
     pass
-def display_balances(self):
-    print(f"Imaginary balance: ${self.imaginary_balance:.2f}")
-    print(f"Real balance: ${self.real_balance:.2f}")
+print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
 
-def verify_password(self, input_password):
-    input_hash = hashlib.sha256(input_password.encode()).hexdigest()
-    return input_hash == self.password_hash
+
+    def display_balances(self):
+        print(f"Imaginary balance: ${self.imaginary_balance:.2f}")
+        print(f"Real balance: ${self.real_balance:.2f}")
+
+    def verify_password(self, input_password):
+        input_hash = hashlib.sha256(input_password.encode()).hexdigest()
+        return input_hash == self.password_hash
 
     # Create our whimsical-to-real wallet
     password = input("Enter your whimsical password: ")
