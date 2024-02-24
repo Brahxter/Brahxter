@@ -60,7 +60,7 @@ headers = {
 
 # Define withdrawal parameters (replace with actual values)
 withdrawal_data = {
-    'amount': 100.0,  # Amount to withdraw (in USD or other currency)
+    'amount': 50.00,  # Amount to withdraw (in USD or other currency)
     'currency': 'USD',  # Currency (e.g., USD, BTC, ETH)
     'payment_method': 'your_payment_method_id'  # Add a payment method in your Coinbase account
 }
