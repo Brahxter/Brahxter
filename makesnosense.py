@@ -31,6 +31,8 @@ class WhimsicalToRealWallet:
         # Replace this with actual Coinbase Wallet integration
         # In reality, you'd need to authenticate and interact with Coinbase's API
         # Here's a simplified example:
+        import requests  # Add missing import statement
+
         try:
             # Your Coinbase API credentials (replace with your actual values)
             api_key = "JJbzfgpOQe6I9myG"
