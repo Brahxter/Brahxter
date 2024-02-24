@@ -44,8 +44,6 @@ class WhimsicalToRealWallet:
             # Construct the API endpoint
         url = "https://api.coinbase.com/v2/accounts"  # Example endpoint
 
-        
-
             # Create a request with authentication headers
         headers = {
                 "Authorization": f"Bearer {api_key}",
