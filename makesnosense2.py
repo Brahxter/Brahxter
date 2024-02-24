@@ -61,17 +61,12 @@ class WhimsicalToRealWallet:
 
         if response.ok:
             data = response.json()
+            account_id = data['id']  # Extract the account ID from the response JSON
         else:
             print(f"API request failed with status {response.status_code}: {response.text}")
-            
-            # Extract relevant info (e.g., account ID, balance, etc.)
-      
-        
 
-            # Simulate sending funds (replace with actual logic)
+        # Simulate sending funds (replace with actual logic)
         print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet (Account ID: {account_id})... Done!")
-
-        
 
         print(f"Sending {self.real_balance:.2f} USD to your Coinbase Wallet... Done!")
 
