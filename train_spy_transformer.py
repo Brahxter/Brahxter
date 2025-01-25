@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 
 def train_model():
-    print("Loading dataset...")
+    print("Loading dataset with improved normalization...")
     dataset = SPYDataset('data/spy_5min_data_2021_2024.csv')
 
     train_size = int(0.8 * len(dataset))
@@ -21,10 +21,12 @@ def train_model():
     print("Initializing enhanced model...")
     model = MetaLearningTransformer(
         d_model=256, nhead=8, num_layers=4, dropout=0.2)
+
+    # Improved optimizer settings
     optimizer = optim.AdamW(model.parameters(), lr=0.0001, weight_decay=0.01)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', patience=3)
-    criterion = nn.MSELoss()
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=10, T_mult=2)
+    criterion = nn.HuberLoss(delta=1.0)  # More robust loss function
 
     num_epochs = 50
     best_val_loss = float('inf')
@@ -45,6 +47,8 @@ def train_model():
             optimizer.step()
             train_loss += loss.item()
 
+        scheduler.step()
+
         model.eval()
         val_loss = 0
         with torch.no_grad():
@@ -55,8 +59,6 @@ def train_model():
         train_loss /= len(train_loader)
         val_loss /= len(val_loader)
 
-        scheduler.step(val_loss)
-
         print(f'\nEpoch {epoch+1}/{num_epochs}')
         print(f'Training Loss: {train_loss:.6f}')
         print(f'Validation Loss: {val_loss:.6f}')
@@ -64,6 +66,7 @@ def train_model():
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), 'models/best_spy_transformer.pth')
+            print(f"New best model saved! Loss: {val_loss:.6f}")
             no_improve = 0
         else:
             no_improve += 1
