@@ -17,12 +17,6 @@ class SPYDataset(Dataset):
         self.data['trading_day'] = self.data['TimeStamp'].dt.date
         self.trading_days = self.data['trading_day'].unique()
 
-        # Calculate daily returns for target
-        self.data['daily_close'] = self.data.groupby(
-            'trading_day')['close'].transform('last')
-        self.data['daily_return'] = self.data.groupby('trading_day')['daily_close'].transform(
-            lambda x: (x.iloc[-1] / x.iloc[0]) - 1)
-
     def __len__(self):
         return len(self.trading_days)
 
@@ -41,13 +35,17 @@ class SPYDataset(Dataset):
         prices = opening_range[['open', 'high', 'low', 'close']].values
         prices = (prices - base_price) / base_price
 
-        # Normalize volume
+        # Normalize volume with standard deviation
         volumes = opening_range[['Volume']].values
-        volume_mean = volumes.mean()
-        volumes = (volumes - volume_mean) / volume_mean
+        volume_std = volumes.std()
+        if volume_std > 0:
+            volumes = (volumes - volumes.mean()) / volume_std
+        else:
+            volumes = volumes - volumes.mean()
 
-        # Get daily target (close price relative to open)
-        target = day_data['daily_return'].iloc[-1]
+        # Calculate daily return for target
+        daily_close = day_data['close'].iloc[-1]
+        target = (daily_close / base_price) - 1
 
         return {
             'prices': torch.FloatTensor(prices),
@@ -60,6 +58,7 @@ class MetaLearningTransformer(nn.Module):
     def __init__(self, d_model=256, nhead=8, num_layers=4, dropout=0.2):
         super().__init__()
 
+        # 4 price features + 1 volume feature
         self.input_embedding = nn.Linear(5, d_model)
         self.positional_encoding = self._create_positional_encoding(
             78, d_model)
@@ -89,12 +88,7 @@ class MetaLearningTransformer(nn.Module):
         self.attention_weights = nn.Linear(d_model, 1)
 
     def forward(self, x):
-        # Original method for testing
-        if isinstance(x, dict) and 'prices' in x and 'volumes' in x:
-            prices = x['prices']
-            volumes = x['volumes']
-            x = torch.cat([prices, volumes], dim=-1)
-
+        x = torch.cat([x['prices'], x['volumes']], dim=-1)
         x = self.input_embedding(x)
         x = x + self.positional_encoding[:x.size(1)].unsqueeze(0)
 
@@ -104,14 +98,6 @@ class MetaLearningTransformer(nn.Module):
         attended = torch.sum(attention_scores * encoded, dim=1)
 
         return self.prediction_layers(attended)
-
-    def predict_realtime(self, x):
-        # Method for dashboard real-time predictions
-        prices = x['prices'].unsqueeze(0)
-        volumes = x['volumes'].unsqueeze(0)
-        x = torch.cat([prices, volumes], dim=-1)
-
-        return self.forward(x)
 
     def _create_positional_encoding(self, max_len, d_model):
         pos_encoding = torch.zeros(max_len, d_model)
