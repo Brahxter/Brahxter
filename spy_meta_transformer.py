@@ -10,29 +10,49 @@ class SPYDataset(Dataset):
         self.data = pd.read_csv(csv_file)
         self.sequence_length = sequence_length
 
-        # Enhanced normalization using percentage changes
-        self.data['returns'] = self.data['close'].pct_change()
-        self.returns_std = self.data['returns'].std()
+        # Convert timestamp to datetime
+        self.data['TimeStamp'] = pd.to_datetime(self.data['TimeStamp'])
+
+        # Group data by trading day
+        self.data['trading_day'] = self.data['TimeStamp'].dt.date
+        self.trading_days = self.data['trading_day'].unique()
+
+        # Calculate daily returns for target
+        self.data['daily_close'] = self.data.groupby(
+            'trading_day')['close'].transform('last')
+        self.data['daily_return'] = self.data.groupby('trading_day')['daily_close'].transform(
+            lambda x: (x.iloc[-1] / x.iloc[0]) - 1)
 
     def __len__(self):
-        return len(self.data) - self.sequence_length
+        return len(self.trading_days)
 
     def __getitem__(self, idx):
-        sequence = self.data.iloc[idx:idx + self.sequence_length]
+        trading_day = self.trading_days[idx]
+        day_data = self.data[self.data['trading_day'] == trading_day]
 
-        # Normalize using relative changes
-        prices = sequence[['open', 'high', 'low', 'close']].values
-        base_price = prices[0, -1]  # First close price
+        # Get first 30 minutes of trading (6 5-minute candles)
+        opening_range = day_data.iloc[:6]
+
+        if len(opening_range) < 6:
+            return None
+
+        # Normalize prices relative to opening price
+        base_price = opening_range['open'].iloc[0]
+        prices = opening_range[['open', 'high', 'low', 'close']].values
         prices = (prices - base_price) / base_price
 
-        volumes = sequence[['Volume']].values
+        # Normalize volume
+        volumes = opening_range[['Volume']].values
         volume_mean = volumes.mean()
         volumes = (volumes - volume_mean) / volume_mean
+
+        # Get daily target (close price relative to open)
+        target = day_data['daily_return'].iloc[-1]
 
         return {
             'prices': torch.FloatTensor(prices),
             'volumes': torch.FloatTensor(volumes),
-            'target': torch.FloatTensor([sequence['close'].iloc[-1] / base_price - 1])
+            'target': torch.FloatTensor([target])
         }
 
 
@@ -54,7 +74,6 @@ class MetaLearningTransformer(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(
             encoder_layer, num_layers)
 
-        # Refined prediction head
         self.prediction_layers = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.LayerNorm(d_model),
@@ -64,13 +83,18 @@ class MetaLearningTransformer(nn.Module):
             nn.LayerNorm(d_model // 2),
             nn.ReLU(),
             nn.Linear(d_model // 2, 1),
-            nn.Tanh()  # Constrain output to [-1, 1] range
+            nn.Tanh()
         )
 
         self.attention_weights = nn.Linear(d_model, 1)
 
     def forward(self, x):
-        x = torch.cat([x['prices'], x['volumes']], dim=-1)
+        # Original method for testing
+        if isinstance(x, dict) and 'prices' in x and 'volumes' in x:
+            prices = x['prices']
+            volumes = x['volumes']
+            x = torch.cat([prices, volumes], dim=-1)
+
         x = self.input_embedding(x)
         x = x + self.positional_encoding[:x.size(1)].unsqueeze(0)
 
@@ -80,6 +104,14 @@ class MetaLearningTransformer(nn.Module):
         attended = torch.sum(attention_scores * encoded, dim=1)
 
         return self.prediction_layers(attended)
+
+    def predict_realtime(self, x):
+        # Method for dashboard real-time predictions
+        prices = x['prices'].unsqueeze(0)
+        volumes = x['volumes'].unsqueeze(0)
+        x = torch.cat([prices, volumes], dim=-1)
+
+        return self.forward(x)
 
     def _create_positional_encoding(self, max_len, d_model):
         pos_encoding = torch.zeros(max_len, d_model)
