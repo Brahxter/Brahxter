@@ -7,15 +7,19 @@ from datetime import datetime
 import os
 
 def train_model(resume_from=None):
-    # Initialize model and dataset
-    model = MetaLearningTransformer(d_model=256, nhead=8, num_layers=4, dropout=0.2)
-    train_dataset = SPYDataset('data/spy_5min_data_2020_2023.csv')
-    val_dataset = SPYDataset('data/spy_5min_data_2023_2024.csv')
+    print("Loading dataset with improved normalization...")
+    dataset = SPYDataset('data/spy_5min_data_2021_2024.csv')
+    
+    # Split dataset into train and validation
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
     
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=32)
     
-    # Training settings
+    # Initialize model and training components
+    model = MetaLearningTransformer(d_model=256, nhead=8, num_layers=4, dropout=0.2)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5)
