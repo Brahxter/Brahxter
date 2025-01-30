@@ -49,22 +49,12 @@ class SPYDataset(Dataset):
     def __init__(self, csv_file, sequence_length=78):
         self.data = pd.read_csv(csv_file)
         self.sequence_length = sequence_length
-
         self.data['TimeStamp'] = pd.to_datetime(self.data['TimeStamp'])
         self.data['trading_day'] = self.data['TimeStamp'].dt.date
-
-        # Enhanced market microstructure features
-        self.data['price_velocity'] = self.data['close'].diff() / \
-            self.data['/ES volume']
-        self.data['volume_intensity'] = self.data.groupby('trading_day')['/ES volume'].transform(
-            lambda x: (x - x.mean()) / (x.std() + 1e-6))
-        self.data['price_acceleration'] = self.data['price_velocity'].diff()
-        self.data['volume_momentum'] = self.data['volume_intensity'].rolling(
-            3).mean()
-
         self.trading_days = self.data['trading_day'].unique()
 
     def __len__(self):
+        # Return number of trading days instead of data points
         return len(self.trading_days)
 
     def __getitem__(self, idx):
@@ -80,7 +70,7 @@ class SPYDataset(Dataset):
         price_std = np.std(prices) + 1e-6
         prices = np.clip((prices - base_price) / price_std, -0.1, 0.1)
 
-        volumes = opening_range[['/ES volume']].values
+        volumes = opening_range[['Volume']].values
         volume_std = np.std(volumes) + 1e-6
         volumes = np.clip((volumes - np.mean(volumes)) / volume_std, -5, 5)
 
