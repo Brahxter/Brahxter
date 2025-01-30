@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -5,41 +6,55 @@ import os
 from spy_meta_transformer import MetaLearningTransformer, SPYDataset
 
 
+class CosineWarmupScheduler(torch.optim.lr_scheduler._LRScheduler):
+    def __init__(self, optimizer, warmup_epochs, max_epochs):
+        self.warmup_epochs = warmup_epochs
+        self.max_epochs = max_epochs
+        super().__init__(optimizer)
+
+    def get_lr(self):
+        epoch = self.last_epoch
+        if epoch < self.warmup_epochs:
+            return [base_lr * (epoch + 1) / self.warmup_epochs for base_lr in self.base_lrs]
+        else:
+            progress = (epoch - self.warmup_epochs) / \
+                (self.max_epochs - self.warmup_epochs)
+            return [base_lr * 0.5 * (1 + math.cos(math.pi * progress)) for base_lr in self.base_lrs]
+
+
 def train_model(checkpoint_path=None):
-    # Initialize model and training parameters
     model = MetaLearningTransformer(
         d_model=256, nhead=8, num_layers=4, dropout=0.2)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=1e-4, weight_decay=0.01)
+    scheduler = CosineWarmupScheduler(
+        optimizer, warmup_epochs=5, max_epochs=100)
     criterion = nn.MSELoss()
     num_epochs = 100
 
-    # Create checkpoint directory if it doesn't exist
     checkpoint_dir = 'models/checkpoints'
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # Load datasets
     train_dataset = SPYDataset('data/spy_train.csv')
     val_dataset = SPYDataset('data/spy_val.csv')
 
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-    # Initialize best metrics tracking
     best_val_loss = float('inf')
     best_accuracy = 0
     best_epoch = 0
 
-    # Resume from checkpoint if provided
-    start_epoch = 0
     if checkpoint_path and os.path.exists(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         start_epoch = checkpoint['epoch'] + 1
         print(f'Resuming from epoch {start_epoch}')
+    else:
+        start_epoch = 0
 
     for epoch in range(start_epoch, num_epochs):
-        # Training phase
         model.train()
         train_loss = 0
         for batch in train_loader:
@@ -47,11 +62,13 @@ def train_model(checkpoint_path=None):
             output = model(batch)
             loss = criterion(output, batch['target'])
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             train_loss += loss.item()
-        train_loss /= len(train_loader)
 
-        # Validation phase
+        train_loss /= len(train_loader)
+        scheduler.step()
+
         model.eval()
         val_loss = 0
         correct_predictions = 0
@@ -62,7 +79,6 @@ def train_model(checkpoint_path=None):
                 output = model(batch)
                 val_loss += criterion(output, batch['target']).item()
 
-                # Calculate direction accuracy
                 pred_direction = (output > 0).float()
                 true_direction = (batch['target'] > 0).float()
                 correct_predictions += (pred_direction ==
@@ -77,7 +93,6 @@ def train_model(checkpoint_path=None):
         print(f'Val Loss: {val_loss:.6f}')
         print(f'Direction Accuracy: {direction_accuracy:.2f}%')
 
-        # Update best metrics
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_epoch = epoch + 1
@@ -87,7 +102,6 @@ def train_model(checkpoint_path=None):
         if direction_accuracy > best_accuracy:
             best_accuracy = direction_accuracy
 
-        # Save periodic checkpoint
         if (epoch + 1) % 5 == 0:
             checkpoint_path = f'{
                 checkpoint_dir}/spy_transformer_epoch_{epoch+1}.pth'
@@ -102,7 +116,6 @@ def train_model(checkpoint_path=None):
 
         print('-' * 50)
 
-    # Print final statistics
     print_final_stats(best_val_loss, best_accuracy, best_epoch)
 
 
@@ -116,5 +129,3 @@ def print_final_stats(best_val_loss, best_accuracy, best_epoch):
 
 if __name__ == "__main__":
     train_model()
-    # To resume from checkpoint:
-    # train_model('models/checkpoints/spy_transformer_epoch_25.pth')
