@@ -106,12 +106,17 @@ class TransformerTrainer:
 
 
 def main():
-    # Data loading
-    train_dataset = SPYDataset(start_date='2010-01-01', end_date='2022-12-31')
-    val_dataset = SPYDataset(start_date='2023-01-01', end_date='2023-12-31')
+    # Create checkpoint directory
+    checkpoint_dir = 'models/checkpoints'
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    # Data loading from CSV files
+    train_dataset = SPYDataset('data/spy_train.csv')
+    val_dataset = SPYDataset('data/spy_val.csv')
 
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
 
     # Model initialization
     model = MetaLearningTransformer(
