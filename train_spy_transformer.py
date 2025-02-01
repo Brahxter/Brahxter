@@ -1,131 +1,167 @@
-import math
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-import os
+import numpy as np
 from spy_meta_transformer import MetaLearningTransformer, SPYDataset
+from meta_trainer import MetaTrainer
+from market_tasks import MarketTask
+import logging
+from datetime import datetime
+import os
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-class CosineWarmupScheduler(torch.optim.lr_scheduler._LRScheduler):
-    def __init__(self, optimizer, warmup_epochs, max_epochs):
-        self.warmup_epochs = warmup_epochs
-        self.max_epochs = max_epochs
-        super().__init__(optimizer)
+class TransformerTrainer:
+    def __init__(self, model, train_loader, val_loader, learning_rate=0.001):
+        self.model = model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.criterion = nn.MSELoss()
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    def get_lr(self):
-        epoch = self.last_epoch
-        if epoch < self.warmup_epochs:
-            return [base_lr * (epoch + 1) / self.warmup_epochs for base_lr in self.base_lrs]
-        else:
-            progress = (epoch - self.warmup_epochs) / \
-                (self.max_epochs - self.warmup_epochs)
-            return [base_lr * 0.5 * (1 + math.cos(math.pi * progress)) for base_lr in self.base_lrs]
+        # Initialize meta-learning components
+        self.market_tasks = self.create_market_tasks()
+        self.meta_trainer = MetaTrainer(
+            model=self.model, tasks=self.market_tasks)
 
+    def create_market_tasks(self):
+        tasks = []
+        for batch in self.train_loader:
+            trend_task = MarketTask(batch, 'trend_following')
+            reversion_task = MarketTask(batch, 'mean_reversion')
+            breakout_task = MarketTask(batch, 'breakout')
+            tasks.extend([trend_task, reversion_task, breakout_task])
+        return tasks
 
-def train_model(checkpoint_path=None):
-    model = MetaLearningTransformer(
-        d_model=256, nhead=8, num_layers=4, dropout=0.2)
-    optimizer = torch.optim.AdamW(
-        model.parameters(), lr=1e-4, weight_decay=0.01)
-    scheduler = CosineWarmupScheduler(
-        optimizer, warmup_epochs=5, max_epochs=100)
-    criterion = nn.MSELoss()
-    num_epochs = 100
+    def train_epoch(self):
+        self.model.train()
+        total_loss = 0
+        for batch_idx, batch in enumerate(self.train_loader):
+            if batch is None:
+                continue
 
-    checkpoint_dir = 'models/checkpoints'
-    os.makedirs(checkpoint_dir, exist_ok=True)
+            # Regular training step
+            prices = batch['prices']
+            volumes = batch['volumes']
+            targets = batch['target']
 
-    train_dataset = SPYDataset('data/spy_train.csv')
-    val_dataset = SPYDataset('data/spy_val.csv')
+            self.optimizer.zero_grad()
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+            # Forward pass
+            predictions = self.model(prices)
+            loss = self.criterion(predictions, targets)
 
-    best_val_loss = float('inf')
-    best_accuracy = 0
-    best_epoch = 0
+            # Meta-learning step
+            meta_loss = self.meta_trainer.train_step(task_batch_size=4)
 
-    if checkpoint_path and os.path.exists(checkpoint_path):
-        checkpoint = torch.load(checkpoint_path)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        start_epoch = checkpoint['epoch'] + 1
-        print(f'Resuming from epoch {start_epoch}')
-    else:
-        start_epoch = 0
+            # Combined loss
+            total_batch_loss = loss + meta_loss
 
-    for epoch in range(start_epoch, num_epochs):
-        model.train()
-        train_loss = 0
-        for batch in train_loader:
-            optimizer.zero_grad()
-            output = model(batch)
-            loss = criterion(output, batch['target'])
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
-            train_loss += loss.item()
+            # Backward pass
+            total_batch_loss.backward()
+            self.optimizer.step()
 
-        train_loss /= len(train_loader)
-        scheduler.step()
+            total_loss += total_batch_loss.item()
 
-        model.eval()
-        val_loss = 0
-        correct_predictions = 0
-        total_predictions = 0
+            if batch_idx % 100 == 0:
+                logger.info(f'Batch {batch_idx}, Loss: {
+                            total_batch_loss.item():.6f}')
+
+        return total_loss / len(self.train_loader)
+
+    def validate(self):
+        self.model.eval()
+        total_loss = 0
+        predictions = []
+        actuals = []
 
         with torch.no_grad():
-            for batch in val_loader:
-                output = model(batch)
-                val_loss += criterion(output, batch['target']).item()
+            for batch in self.val_loader:
+                if batch is None:
+                    continue
 
-                pred_direction = (output > 0).float()
-                true_direction = (batch['target'] > 0).float()
-                correct_predictions += (pred_direction ==
-                                        true_direction).sum().item()
-                total_predictions += len(output)
+                prices = batch['prices']
+                volumes = batch['volumes']
+                targets = batch['target']
 
-        val_loss /= len(val_loader)
-        direction_accuracy = (correct_predictions / total_predictions) * 100
+                outputs = self.model(prices)
+                loss = self.criterion(outputs, targets)
 
-        print(f'Epoch {epoch + 1}:')
-        print(f'Train Loss: {train_loss:.6f}')
-        print(f'Val Loss: {val_loss:.6f}')
-        print(f'Direction Accuracy: {direction_accuracy:.2f}%')
+                total_loss += loss.item()
+                predictions.extend(outputs.numpy())
+                actuals.extend(targets.numpy())
 
+        val_loss = total_loss / len(self.val_loader)
+        accuracy = self.calculate_accuracy(predictions, actuals)
+
+        return val_loss, accuracy
+
+    def calculate_accuracy(self, predictions, actuals):
+        predictions = np.array(predictions)
+        actuals = np.array(actuals)
+        correct_direction = np.sum(np.sign(predictions) == np.sign(actuals))
+        return correct_direction / len(predictions)
+
+
+def main():
+    # Data loading
+    train_dataset = SPYDataset(start_date='2010-01-01', end_date='2022-12-31')
+    val_dataset = SPYDataset(start_date='2023-01-01', end_date='2023-12-31')
+
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=32)
+
+    # Model initialization
+    model = MetaLearningTransformer(
+        d_model=256, nhead=8, num_layers=4, dropout=0.2)
+
+    # Training setup
+    trainer = TransformerTrainer(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        learning_rate=0.001
+    )
+
+    # Training loop
+    num_epochs = 100
+    best_val_loss = float('inf')
+
+    # Create models directory if it doesn't exist
+    os.makedirs('models', exist_ok=True)
+
+    for epoch in range(num_epochs):
+        logger.info(f"Epoch {epoch+1}/{num_epochs}")
+
+        # Train
+        train_loss = trainer.train_epoch()
+        logger.info(f"Training Loss: {train_loss:.6f}")
+
+        # Validate
+        val_loss, accuracy = trainer.validate()
+        logger.info(f"Validation Loss: {
+                    val_loss:.6f}, Accuracy: {accuracy:.2%}")
+
+        # Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            best_epoch = epoch + 1
             torch.save(model.state_dict(), 'models/best_spy_transformer.pth')
-            print(f'New best model saved with validation loss: {val_loss:.6f}')
+            logger.info("New best model saved!")
 
-        if direction_accuracy > best_accuracy:
-            best_accuracy = direction_accuracy
-
-        if (epoch + 1) % 5 == 0:
-            checkpoint_path = f'{
-                checkpoint_dir}/spy_transformer_epoch_{epoch+1}.pth'
+        # Regular checkpoint saving
+        if (epoch + 1) % 10 == 0:
+            checkpoint_path = f'models/spy_transformer_epoch_{epoch+1}.pth'
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
+                'optimizer_state_dict': trainer.optimizer.state_dict(),
                 'train_loss': train_loss,
-                'val_loss': val_loss
+                'val_loss': val_loss,
             }, checkpoint_path)
-            print(f'Periodic checkpoint saved: {checkpoint_path}')
-
-        print('-' * 50)
-
-    print_final_stats(best_val_loss, best_accuracy, best_epoch)
-
-
-def print_final_stats(best_val_loss, best_accuracy, best_epoch):
-    print("\n=== Final Model Statistics ===")
-    print(f"Best Validation Loss: {best_val_loss:.6f}")
-    print(f"Best Direction Accuracy: {best_accuracy:.2f}%")
-    print(f"Best Model Epoch: {best_epoch}")
-    print("============================")
+            logger.info(f"Checkpoint saved: {checkpoint_path}")
 
 
 if __name__ == "__main__":
-    train_model()
+    main()
