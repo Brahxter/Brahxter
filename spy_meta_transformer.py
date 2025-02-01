@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
-import math
 from torch.utils.data import Dataset
 
 
@@ -54,7 +53,6 @@ class SPYDataset(Dataset):
         self.trading_days = self.data['trading_day'].unique()
 
     def __len__(self):
-        # Return number of trading days instead of data points
         return len(self.trading_days)
 
     def __getitem__(self, idx):
@@ -87,53 +85,36 @@ class SPYDataset(Dataset):
 class MetaLearningTransformer(nn.Module):
     def __init__(self, d_model=256, nhead=8, num_layers=4, dropout=0.2):
         super().__init__()
-
-        self.feature_processor = MultiScaleFeatureProcessor(d_model)
-        self.adaptive_attention = AdaptiveAttention(d_model)
-
-        self.positional_encoding = self._create_positional_encoding(
-            78, d_model)
-
-        encoder_layer = nn.TransformerEncoderLayer(
+        self.transformer = nn.Transformer(
             d_model=d_model,
             nhead=nhead,
-            dim_feedforward=2048,
-            dropout=dropout,
-            batch_first=True
-        )
-        self.transformer_encoder = nn.TransformerEncoder(
-            encoder_layer, num_layers)
-
-        self.prediction_head = nn.Sequential(
-            nn.Linear(d_model, d_model),
-            nn.LayerNorm(d_model),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_model, d_model // 2),
-            nn.LayerNorm(d_model // 2),
-            nn.GELU(),
-            nn.Linear(d_model // 2, d_model // 4),
-            nn.LayerNorm(d_model // 4),
-            nn.GELU(),
-            nn.Linear(d_model // 4, 1),
-            nn.Tanh()
+            num_layers=num_layers,
+            dropout=dropout
         )
 
-        self.attention_weights = nn.Linear(d_model, 1)
+    def adapt(self, support_set):
+        # Quick adaptation to new patterns
+        adapted_params = self.get_quick_weights(support_set)
+        return adapted_params
+
+    def get_quick_weights(self, data):
+        # MAML-style quick adaptation
+        grads = self.compute_gradients(data)
+        quick_weights = self.update_weights(grads)
+        return quick_weights
+
+    def compute_gradients(self, data):
+        loss = self.calculate_loss(data)
+        return torch.autograd.grad(loss, self.parameters())
+
+    def update_weights(self, gradients):
+        quick_weights = {}
+        for (name, param), grad in zip(self.named_parameters(), gradients):
+            quick_weights[name] = param - self.learning_rate * grad
+        return quick_weights
 
     def forward(self, x):
-        processed_features = self.feature_processor(x['prices'], x['volumes'])
-        attended_features = self.adaptive_attention(processed_features)
-
-        x = attended_features + \
-            self.positional_encoding[:attended_features.size(1)].unsqueeze(0)
-
-        encoded = self.transformer_encoder(x)
-        attention_scores = torch.softmax(
-            self.attention_weights(encoded), dim=1)
-        context = torch.sum(attention_scores * encoded, dim=1)
-
-        return self.prediction_head(context)
+        return self.transformer(x)
 
     def _create_positional_encoding(self, max_len, d_model):
         pos_encoding = torch.zeros(max_len, d_model)
