@@ -5,51 +5,15 @@ import pandas as pd
 from torch.utils.data import Dataset
 
 
-class MultiScaleFeatureProcessor(nn.Module):
-    def __init__(self, d_model):
-        super().__init__()
-        self.price_convs = nn.ModuleList([
-            nn.Conv1d(4, d_model, kernel_size=k, padding=k//2)
-            for k in [3, 5, 7]
-        ])
-        self.volume_convs = nn.ModuleList([
-            nn.Conv1d(1, d_model, kernel_size=k, padding=k//2)
-            for k in [3, 5, 7]
-        ])
-        self.feature_fusion = nn.Linear(d_model * 6, d_model)
-
-    def forward(self, price_data, volume_data):
-        price_features = [conv(price_data.transpose(1, 2))
-                          for conv in self.price_convs]
-        volume_features = [conv(volume_data.transpose(1, 2))
-                           for conv in self.volume_convs]
-        combined = torch.cat(price_features + volume_features, dim=1)
-        return self.feature_fusion(combined.transpose(1, 2))
-
-
-class AdaptiveAttention(nn.Module):
-    def __init__(self, d_model):
-        super().__init__()
-        self.temperature = nn.Parameter(
-            torch.sqrt(torch.FloatTensor([d_model])))
-        self.qkv_transform = nn.Linear(d_model, d_model * 3)
-        self.out_proj = nn.Linear(d_model, d_model)
-        self.scale = d_model ** -0.5
-
-    def forward(self, x):
-        qkv = self.qkv_transform(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: t.contiguous(), qkv)
-        attn = (q @ k.transpose(-2, -1)) * self.scale
-        attn = attn.softmax(dim=-1)
-        return self.out_proj(attn @ v)
-
-
 class SPYDataset(Dataset):
-    def __init__(self, csv_file, sequence_length=78):
+    def __init__(self, csv_file):
         self.data = pd.read_csv(csv_file)
-        self.sequence_length = sequence_length
-        self.data['TimeStamp'] = pd.to_datetime(self.data['TimeStamp'])
-        self.data['trading_day'] = self.data['TimeStamp'].dt.date
+
+        # Rename 'TimeStamp' to 'date' for consistency
+        self.data.rename(columns={'TimeStamp': 'date'}, inplace=True)
+
+        # Convert 'date' column to datetime and extract trading day
+        self.data['trading_day'] = pd.to_datetime(self.data['date']).dt.date
         self.trading_days = self.data['trading_day'].unique()
 
     def __len__(self):
@@ -76,8 +40,8 @@ class SPYDataset(Dataset):
         target = np.clip((daily_close / base_price) - 1, -0.1, 0.1)
 
         return {
-            'prices': torch.FloatTensor(prices),
-            'volumes': torch.FloatTensor(volumes),
+            'prices': torch.FloatTensor(prices),   # expected shape: (6, 4)
+            'volumes': torch.FloatTensor(volumes),   # expected shape: (6, 1)
             'target': torch.FloatTensor([target])
         }
 
@@ -85,20 +49,55 @@ class SPYDataset(Dataset):
 class MetaLearningTransformer(nn.Module):
     def __init__(self, d_model=256, nhead=8, num_layers=4, dropout=0.2):
         super().__init__()
+        self.d_model = d_model
+        # Add an input projection layer to map the 4 features to d_model.
+        self.input_projection = nn.Linear(4, d_model)
         self.transformer = nn.Transformer(
             d_model=d_model,
             nhead=nhead,
-            num_layers=num_layers,
-            dropout=dropout
+            num_encoder_layers=num_layers,
+            num_decoder_layers=num_layers,
+            dropout=dropout,
+            batch_first=True
         )
+        # Output layer to map transformer output to a single prediction value
+        self.output_layer = nn.Linear(d_model, 1)
+
+        # Dummy learning rate for adaptation routines
+        self.learning_rate = 0.001
+
+    def forward(self, x):
+        # x is expected to be of shape (batch, seq, 4)
+        # Apply the linear projection so that features become d_model.
+        x = self.input_projection(x)  # Now shape: (batch, seq, d_model)
+        # Create a target sequence as a clone of x.
+        tgt = x.clone()
+
+        # If x has no batch dim, add one.
+        if len(x.shape) == 2:
+            x = x.unsqueeze(0)
+        if len(tgt.shape) == 2:
+            tgt = tgt.unsqueeze(0)
+
+        # Transformer expects inputs as (seq_len, batch, d_model)
+        x = x.transpose(0, 1)
+        tgt = tgt.transpose(0, 1)
+
+        # Shape: (seq_len, batch, d_model)
+        output = self.transformer(src=x, tgt=tgt)
+
+        # Get the last output in the sequence and project to a single prediction
+        output = output[-1]  # Shape: (batch, d_model)
+        output = self.output_layer(output)  # Shape: (batch, 1)
+        return output
+
+    # --- Meta-learning Adaptation Mechanisms ---
 
     def adapt(self, support_set):
-        # Quick adaptation to new patterns
         adapted_params = self.get_quick_weights(support_set)
         return adapted_params
 
     def get_quick_weights(self, data):
-        # MAML-style quick adaptation
         grads = self.compute_gradients(data)
         quick_weights = self.update_weights(grads)
         return quick_weights
@@ -113,15 +112,6 @@ class MetaLearningTransformer(nn.Module):
             quick_weights[name] = param - self.learning_rate * grad
         return quick_weights
 
-    def forward(self, x):
-        return self.transformer(x)
-
-    def _create_positional_encoding(self, max_len, d_model):
-        pos_encoding = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(
-            0, d_model, 2).float() * (-np.log(10000.0) / d_model))
-
-        pos_encoding[:, 0::2] = torch.sin(position * div_term)
-        pos_encoding[:, 1::2] = torch.cos(position * div_term)
-        return pos_encoding
+    def calculate_loss(self, data):
+        # Dummy loss; replace with proper meta-learning loss calculation.
+        return torch.tensor(0.0, requires_grad=True)
