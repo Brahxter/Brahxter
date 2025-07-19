@@ -13,8 +13,7 @@ import os
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from collections import defaultdict
-from sklearn.metrics import f1_score
-from sklearn.metrics import precision_score, recall_score, confusion_matrix, classification_report
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 
 
 def create_sequences(data, seq_length):
@@ -494,40 +493,29 @@ def plot_training_metrics(metrics, classification):
     plt.close()
 
 
-def evaluate_model(model, test_loader, classification=True):
-    print("📊 Evaluating model performance...")
+def evaluate_model(model, test_loader):
     model.eval()
-
-    predictions = []
-    true_values = []
-    total_loss = 0
-    regression_criterion = nn.MSELoss()
+    all_preds = []
+    all_targets = []
+    test_loss = 0
 
     with torch.no_grad():
         for batch in test_loader:
-            if classification:
-                X_batch, y_reg_batch, y_cls_batch = [
-                    b.to(device) for b in batch]
-                reg_out, cls_out = model(X_batch)
-                predictions.extend(torch.argmax(cls_out, dim=1).cpu().numpy())
-                true_values.extend(y_cls_batch.cpu().numpy())
-            else:
-                X_batch, y_reg_batch = [b.to(device) for b in batch]
-                reg_out = model(X_batch)
-                predictions.extend(reg_out.squeeze().cpu().numpy())
-                true_values.extend(y_reg_batch.cpu().numpy())
+            X_batch, y_reg_batch, y_cls_batch = [b.to(device) for b in batch]
+            reg_out, cls_out = model(X_batch)
 
-            loss = regression_criterion(reg_out.squeeze(), y_reg_batch)
-            total_loss += loss.item()
+            _, predicted = torch.max(cls_out.data, 1)
+            all_preds.extend(predicted.cpu().numpy())
+            all_targets.extend(y_cls_batch.cpu().numpy())
 
+    # Calculate metrics
     results = {
-        'mse': total_loss / len(test_loader)
+        'accuracy': accuracy_score(all_targets, all_preds),
+        'f1_score': f1_score(all_targets, all_preds, average='weighted'),
+        'precision': precision_score(all_targets, all_preds, average='weighted'),
+        'recall': recall_score(all_targets, all_preds, average='weighted'),
+        'confusion_matrix': confusion_matrix(all_targets, all_preds)
     }
-
-    if classification:
-        from sklearn.metrics import classification_report
-        results['classification_report'] = classification_report(
-            true_values, predictions)
 
     return results
 
@@ -667,6 +655,9 @@ if __name__ == "__main__":
         df = calculate_ultimate_technical_features(df)
         print(f"✨ Created {len(df.columns)} features")
 
+        # Clean data
+        df = df.ffill().bfill()  # Updated to use newer methods
+
         # Detect market regimes
         regimes, regime_stats = detect_market_regime(df['return_1'])
         df['market_regime'] = regimes
@@ -681,22 +672,10 @@ if __name__ == "__main__":
         X = df[feature_columns].values
         y = df['return_1'].values
 
-        # Clean data: replace inf/-inf with nan, then fill
-        X = np.where(np.isfinite(X), X, np.nan)
-        X = np.nan_to_num(X, nan=0.0)
-
         # Create classification targets
         returns_for_classification = df['return_1'].copy()
-
-        # Remove NaN before binning
-        returns_for_classification = returns_for_classification.fillna(0)
-
-        # pd.qcut can still produce NaN if there are too many duplicate values at the bin edges
-        y_class = pd.qcut(returns_for_classification, q=3, labels=[0, 1, 2])
-        # Fill any NaN bins with the middle class (1) or another default
-        if 1 not in y_class.cat.categories:
-            y_class = y_class.cat.add_categories([1])
-        y_class = y_class.fillna(1).astype(int)
+        y_class = pd.qcut(returns_for_classification, q=3,
+                          labels=[0, 1, 2]).astype(int)
 
         print("\n📊 Class distribution:")
         class_distribution = pd.Series(y_class).value_counts(normalize=True)
