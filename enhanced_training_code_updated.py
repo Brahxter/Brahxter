@@ -720,6 +720,10 @@ if __name__ == "__main__":
             shape = X_dict[split].shape
             X_reshaped = X_dict[split].reshape(-1, shape[-1])
 
+            # Clean inf/-inf and NaN
+            X_reshaped = np.where(np.isfinite(X_reshaped), X_reshaped, np.nan)
+            X_reshaped = np.nan_to_num(X_reshaped, nan=0.0, posinf=0.0, neginf=0.0)
+
             if split == 'train':
                 X_scaled_reshaped = feature_scaler.fit_transform(X_reshaped)
             else:
