@@ -769,6 +769,9 @@ if __name__ == "__main__":
             shape = X_dict[split].shape
             X_reshaped = X_dict[split].reshape(-1, shape[-1])
 
+            # Replace NaN and inf values with finite numbers
+            X_reshaped = np.nan_to_num(X_reshaped, nan=0.0, posinf=0.0, neginf=0.0)
+
             if split == 'train':
                 X_scaled_reshaped = feature_scaler.fit_transform(X_reshaped)
             else:
@@ -860,8 +863,7 @@ if __name__ == "__main__":
                 'num_layers': 2
             },
             'feature_importance': pd.Series(
-                trained_model.regression_head[0].weight.data.cpu(
-                ).numpy().squeeze(),
+                trained_model.regression_head[0].weight.data.cpu().numpy()[0],
                 index=feature_columns
             ).sort_values(ascending=False)
         }
