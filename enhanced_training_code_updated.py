@@ -13,7 +13,8 @@ import os
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from collections import defaultdict
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.metrics import f1_score
+from sklearn.metrics import precision_score, recall_score, confusion_matrix, classification_report
 
 
 def create_sequences(data, seq_length):
@@ -493,143 +494,152 @@ def plot_training_metrics(metrics, classification):
     plt.close()
 
 
-def evaluate_model(model, test_loader):
+def evaluate_model(model, test_loader, classification=True):
+    print("📊 Evaluating model performance...")
     model.eval()
-    all_preds = []
-    all_targets = []
-    test_loss = 0
+
+    predictions = []
+    true_values = []
+    total_loss = 0
+    regression_criterion = nn.MSELoss()
 
     with torch.no_grad():
         for batch in test_loader:
-            X_batch, y_reg_batch, y_cls_batch = [b.to(device) for b in batch]
-            reg_out, cls_out = model(X_batch)
+            if classification:
+                X_batch, y_reg_batch, y_cls_batch = [
+                    b.to(device) for b in batch]
+                reg_out, cls_out = model(X_batch)
+                predictions.extend(torch.argmax(cls_out, dim=1).cpu().numpy())
+                true_values.extend(y_cls_batch.cpu().numpy())
+            else:
+                X_batch, y_reg_batch = [b.to(device) for b in batch]
+                reg_out = model(X_batch)
+                predictions.extend(reg_out.squeeze().cpu().numpy())
+                true_values.extend(y_reg_batch.cpu().numpy())
 
-            _, predicted = torch.max(cls_out.data, 1)
-            all_preds.extend(predicted.cpu().numpy())
-            all_targets.extend(y_cls_batch.cpu().numpy())
+            loss = regression_criterion(reg_out.squeeze(), y_reg_batch)
+            total_loss += loss.item()
 
-    # Calculate metrics
     results = {
-        'accuracy': accuracy_score(all_targets, all_preds),
-        'f1_score': f1_score(all_targets, all_preds, average='weighted'),
-        'precision': precision_score(all_targets, all_preds, average='weighted'),
-        'recall': recall_score(all_targets, all_preds, average='weighted'),
-        'confusion_matrix': confusion_matrix(all_targets, all_preds)
+        'mse': total_loss / len(test_loader)
     }
+
+    if classification:
+        from sklearn.metrics import classification_report
+        results['classification_report'] = classification_report(
+            true_values, predictions)
 
     return results
 
 
-model.eval()
-portfolio_value = [initial_capital]
-current_position = 0  # -1: Short, 0: Neutral, 1: Long
-position_size = 0
-trades = []
+def backtest_model(model, test_data, feature_scaler, target_scaler, initial_capital=100000):
+    print("💰 Starting backtest simulation...")
 
-with torch.no_grad():
-    for i in range(len(test_data['X'])):
-        X = torch.FloatTensor(test_data['X'][i:i+1]).to(device)
-        current_price = test_data['prices'][i]
+    model.eval()
+    portfolio_value = [initial_capital]
+    current_position = 0  # -1: Short, 0: Neutral, 1: Long
+    position_size = 0
+    trades = []
 
-        # Get model predictions
-        if model.classification:
-            reg_pred, cls_pred = model(X)
-            cls_probs = F.softmax(cls_pred, dim=1)
-            predicted_class = torch.argmax(cls_pred, dim=1).item()
-            confidence = cls_probs[0][predicted_class].item()
-        else:
-            reg_pred = model(X)
-            predicted_return = target_scaler.inverse_transform(
-                reg_pred.cpu().numpy().reshape(-1, 1))[0][0]
-            confidence = abs(predicted_return)
+    with torch.no_grad():
+        for i in range(len(test_data['X'])):
+            X = torch.FloatTensor(test_data['X'][i:i+1]).to(device)
+            current_price = test_data['prices'][i]
 
-        # Dynamic position sizing based on confidence
-        base_position_size = POSITION_SIZING_CONFIG['base_size'] * \
-            initial_capital
-        position_size = min(
-            base_position_size *
-            (1 + confidence *
-             POSITION_SIZING_CONFIG['confidence_multiplier']),
-            initial_capital * POSITION_SIZING_CONFIG['max_position']
-        )
+            # Get model predictions
+            if model.classification:
+                reg_pred, cls_pred = model(X)
+                cls_probs = F.softmax(cls_pred, dim=1)
+                predicted_class = torch.argmax(cls_pred, dim=1).item()
+                confidence = cls_probs[0][predicted_class].item()
+            else:
+                reg_pred = model(X)
+                predicted_return = target_scaler.inverse_transform(
+                    reg_pred.cpu().numpy().reshape(-1, 1))[0][0]
+                confidence = abs(predicted_return)
 
-        # Trading logic
-        if current_position == 0:  # No position
-            if predicted_class == 2:  # Buy signal
-                current_position = 1
-                entry_price = current_price
-                trades.append({
-                    'type': 'LONG',
-                    'entry_price': entry_price,
-                    'size': position_size,
-                    'confidence': confidence
-                })
-            elif predicted_class == 0:  # Short signal
-                current_position = -1
-                entry_price = current_price
-                trades.append({
-                    'type': 'SHORT',
-                    'entry_price': entry_price,
-                    'size': position_size,
-                    'confidence': confidence
-                })
-
-        # Position management
-        elif current_position != 0:
-            current_trade = trades[-1]
-            profit_loss = (current_price -
-                           current_trade['entry_price']) * current_position
-            profit_loss_pct = profit_loss / current_trade['entry_price']
-
-            # Dynamic stop loss
-            stop_loss = RISK_MANAGEMENT_CONFIG['base_stop_loss'] * (
-                1 + abs(predicted_return) *
-                RISK_MANAGEMENT_CONFIG['dynamic_stop_loss_multiplier']
+            # Dynamic position sizing based on confidence
+            base_position_size = POSITION_SIZING_CONFIG['base_size'] * \
+                initial_capital
+            position_size = min(
+                base_position_size *
+                (1 + confidence *
+                 POSITION_SIZING_CONFIG['confidence_multiplier']),
+                initial_capital * POSITION_SIZING_CONFIG['max_position']
             )
 
-            # Exit conditions
-            if (profit_loss_pct <= stop_loss or  # Stop loss hit
-                # Take profit hit
-                profit_loss_pct >= RISK_MANAGEMENT_CONFIG['take_profit_target'] or
-                # Signal reversal
-                (current_position == 1 and predicted_class == 0) or
-                    (current_position == -1 and predicted_class == 2)):
+            # Trading logic
+            if current_position == 0:  # No position
+                if predicted_class == 2:  # Buy signal
+                    current_position = 1
+                    entry_price = current_price
+                    trades.append({
+                        'type': 'LONG',
+                        'entry_price': entry_price,
+                        'size': position_size,
+                        'confidence': confidence
+                    })
+                elif predicted_class == 0:  # Short signal
+                    current_position = -1
+                    entry_price = current_price
+                    trades.append({
+                        'type': 'SHORT',
+                        'entry_price': entry_price,
+                        'size': position_size,
+                        'confidence': confidence
+                    })
 
-                # Close position
-                portfolio_value[-1] += profit_loss * position_size
-                current_position = 0
-                trades[-1].update({
-                    'exit_price': current_price,
-                    'profit_loss': profit_loss,
-                    'profit_loss_pct': profit_loss_pct
-                })
+            # Position management
+            elif current_position != 0:
+                current_trade = trades[-1]
+                profit_loss = (current_price -
+                               current_trade['entry_price']) * current_position
+                profit_loss_pct = profit_loss / current_trade['entry_price']
 
-        # Update portfolio value
-        portfolio_value.append(portfolio_value[-1])
+                # Dynamic stop loss
+                stop_loss = RISK_MANAGEMENT_CONFIG['base_stop_loss'] * (
+                    1 + abs(predicted_return) *
+                    RISK_MANAGEMENT_CONFIG['dynamic_stop_loss_multiplier']
+                )
 
-# Calculate performance metrics
-total_return = (portfolio_value[-1] - initial_capital) / initial_capital
-winning_trades = len([t for t in trades if t.get('profit_loss', 0) > 0])
-total_trades = len(trades)
-win_rate = winning_trades / total_trades if total_trades > 0 else 0
+                # Exit conditions
+                if (profit_loss_pct <= stop_loss or  # Stop loss hit
+                    # Take profit hit
+                    profit_loss_pct >= RISK_MANAGEMENT_CONFIG['take_profit_target'] or
+                    # Signal reversal
+                    (current_position == 1 and predicted_class == 0) or
+                        (current_position == -1 and predicted_class == 2)):
 
-print(f"✅ Backtest Results:")
-print(f"Total Return: {total_return:.2%}")
-print(f"Win Rate: {win_rate:.2%}")
-print(f"Total Trades: {total_trades}")
-plt.plot(portfolio_value)
-plt.title("Portfolio Value Over Time")  
-plt.xlabel("Time Steps")
-plt.ylabel("Portfolio Value ($)")   
+                    # Close position
+                    portfolio_value[-1] += profit_loss * position_size
+                    current_position = 0
+                    trades[-1].update({
+                        'exit_price': current_price,
+                        'profit_loss': profit_loss,
+                        'profit_loss_pct': profit_loss_pct
+                    })
 
-plt.savefig(f"{model_dir}/portfolio_value.png")
-plt.close()
-with open(f"{model_dir}/trades.pkl", "wb") as f:
-    pickle.dump(trades, f)
-print(f"Trades saved to {model_dir}/trades.pkl")    
-print(f"Portfolio value plot saved to {model_dir}/portfolio_value.png")
-print("🎉 Trading simulation complete!")
+            # Update portfolio value
+            portfolio_value.append(portfolio_value[-1])
 
+    # Calculate performance metrics
+    total_return = (portfolio_value[-1] - initial_capital) / initial_capital
+    winning_trades = len([t for t in trades if t.get('profit_loss', 0) > 0])
+    total_trades = len(trades)
+    win_rate = winning_trades / total_trades if total_trades > 0 else 0
+
+    print(f"✅ Backtest Results:")
+    print(f"Total Return: {total_return:.2%}")
+    print(f"Win Rate: {win_rate:.2%}")
+    print(f"Total Trades: {total_trades}")
+
+    return {
+        'portfolio_value': portfolio_value,
+        'trades': trades,
+        'total_return': total_return,
+        'win_rate': win_rate,
+        'total_trades': total_trades
+    }
 
 
 if __name__ == "__main__":
@@ -657,9 +667,6 @@ if __name__ == "__main__":
         df = calculate_ultimate_technical_features(df)
         print(f"✨ Created {len(df.columns)} features")
 
-        # Clean data
-        df = df.ffill().bfill()  # Updated to use newer methods
-
         # Detect market regimes
         regimes, regime_stats = detect_market_regime(df['return_1'])
         df['market_regime'] = regimes
@@ -674,10 +681,22 @@ if __name__ == "__main__":
         X = df[feature_columns].values
         y = df['return_1'].values
 
+        # Clean data: replace inf/-inf with nan, then fill
+        X = np.where(np.isfinite(X), X, np.nan)
+        X = np.nan_to_num(X, nan=0.0)
+
         # Create classification targets
         returns_for_classification = df['return_1'].copy()
-        y_class = pd.qcut(returns_for_classification, q=3,
-                          labels=[0, 1, 2]).astype(int)
+
+        # Remove NaN before binning
+        returns_for_classification = returns_for_classification.fillna(0)
+
+        # pd.qcut can still produce NaN if there are too many duplicate values at the bin edges
+        y_class = pd.qcut(returns_for_classification, q=3, labels=[0, 1, 2])
+        # Fill any NaN bins with the middle class (1) or another default
+        if 1 not in y_class.cat.categories:
+            y_class = y_class.cat.add_categories([1])
+        y_class = y_class.fillna(1).astype(int)
 
         print("\n📊 Class distribution:")
         class_distribution = pd.Series(y_class).value_counts(normalize=True)
@@ -721,10 +740,6 @@ if __name__ == "__main__":
             # Reshape to 2D for scaling
             shape = X_dict[split].shape
             X_reshaped = X_dict[split].reshape(-1, shape[-1])
-
-            # Clean inf/-inf and NaN
-            X_reshaped = np.where(np.isfinite(X_reshaped), X_reshaped, np.nan)
-            X_reshaped = np.nan_to_num(X_reshaped, nan=0.0, posinf=0.0, neginf=0.0)
 
             if split == 'train':
                 X_scaled_reshaped = feature_scaler.fit_transform(X_reshaped)
