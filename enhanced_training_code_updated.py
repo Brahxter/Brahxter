@@ -520,115 +520,111 @@ def evaluate_model(model, test_loader):
     return results
 
 
-def backtest_model(model, test_data, feature_scaler, target_scaler, initial_capital=100000):
-    print("💰 Starting backtest simulation...")
+model.eval()
+portfolio_value = [initial_capital]
+current_position = 0  # -1: Short, 0: Neutral, 1: Long
+position_size = 0
+trades = []
 
-    model.eval()
-    portfolio_value = [initial_capital]
-    current_position = 0  # -1: Short, 0: Neutral, 1: Long
-    position_size = 0
-    trades = []
+with torch.no_grad():
+    for i in range(len(test_data['X'])):
+        X = torch.FloatTensor(test_data['X'][i:i+1]).to(device)
+        current_price = test_data['prices'][i]
 
-    with torch.no_grad():
-        for i in range(len(test_data['X'])):
-            X = torch.FloatTensor(test_data['X'][i:i+1]).to(device)
-            current_price = test_data['prices'][i]
+        # Get model predictions
+        if model.classification:
+            reg_pred, cls_pred = model(X)
+            cls_probs = F.softmax(cls_pred, dim=1)
+            predicted_class = torch.argmax(cls_pred, dim=1).item()
+            confidence = cls_probs[0][predicted_class].item()
+        else:
+            reg_pred = model(X)
+            predicted_return = target_scaler.inverse_transform(
+                reg_pred.cpu().numpy().reshape(-1, 1))[0][0]
+            confidence = abs(predicted_return)
 
-            # Get model predictions
-            if model.classification:
-                reg_pred, cls_pred = model(X)
-                cls_probs = F.softmax(cls_pred, dim=1)
-                predicted_class = torch.argmax(cls_pred, dim=1).item()
-                confidence = cls_probs[0][predicted_class].item()
-            else:
-                reg_pred = model(X)
-                predicted_return = target_scaler.inverse_transform(
-                    reg_pred.cpu().numpy().reshape(-1, 1))[0][0]
-                confidence = abs(predicted_return)
+        # Dynamic position sizing based on confidence
+        base_position_size = POSITION_SIZING_CONFIG['base_size'] * \
+            initial_capital
+        position_size = min(
+            base_position_size *
+            (1 + confidence *
+             POSITION_SIZING_CONFIG['confidence_multiplier']),
+            initial_capital * POSITION_SIZING_CONFIG['max_position']
+        )
 
-            # Dynamic position sizing based on confidence
-            base_position_size = POSITION_SIZING_CONFIG['base_size'] * \
-                initial_capital
-            position_size = min(
-                base_position_size *
-                (1 + confidence *
-                 POSITION_SIZING_CONFIG['confidence_multiplier']),
-                initial_capital * POSITION_SIZING_CONFIG['max_position']
+        # Trading logic
+        if current_position == 0:  # No position
+            if predicted_class == 2:  # Buy signal
+                current_position = 1
+                entry_price = current_price
+                trades.append({
+                    'type': 'LONG',
+                    'entry_price': entry_price,
+                    'size': position_size,
+                    'confidence': confidence
+                })
+            elif predicted_class == 0:  # Short signal
+                current_position = -1
+                entry_price = current_price
+                trades.append({
+                    'type': 'SHORT',
+                    'entry_price': entry_price,
+                    'size': position_size,
+                    'confidence': confidence
+                })
+
+        # Position management
+        elif current_position != 0:
+            current_trade = trades[-1]
+            profit_loss = (current_price -
+                           current_trade['entry_price']) * current_position
+            profit_loss_pct = profit_loss / current_trade['entry_price']
+
+            # Dynamic stop loss
+            stop_loss = RISK_MANAGEMENT_CONFIG['base_stop_loss'] * (
+                1 + abs(predicted_return) *
+                RISK_MANAGEMENT_CONFIG['dynamic_stop_loss_multiplier']
             )
 
-            # Trading logic
-            if current_position == 0:  # No position
-                if predicted_class == 2:  # Buy signal
-                    current_position = 1
-                    entry_price = current_price
-                    trades.append({
-                        'type': 'LONG',
-                        'entry_price': entry_price,
-                        'size': position_size,
-                        'confidence': confidence
-                    })
-                elif predicted_class == 0:  # Short signal
-                    current_position = -1
-                    entry_price = current_price
-                    trades.append({
-                        'type': 'SHORT',
-                        'entry_price': entry_price,
-                        'size': position_size,
-                        'confidence': confidence
-                    })
+            # Exit conditions
+            if (profit_loss_pct <= stop_loss or  # Stop loss hit
+                # Take profit hit
+                profit_loss_pct >= RISK_MANAGEMENT_CONFIG['take_profit_target'] or
+                # Signal reversal
+                (current_position == 1 and predicted_class == 0) or
+                    (current_position == -1 and predicted_class == 2)):
 
-            # Position management
-            elif current_position != 0:
-                current_trade = trades[-1]
-                profit_loss = (current_price -
-                               current_trade['entry_price']) * current_position
-                profit_loss_pct = profit_loss / current_trade['entry_price']
+                # Close position
+                portfolio_value[-1] += profit_loss * position_size
+                current_position = 0
+                trades[-1].update({
+                    'exit_price': current_price,
+                    'profit_loss': profit_loss,
+                    'profit_loss_pct': profit_loss_pct
+                })
 
-                # Dynamic stop loss
-                stop_loss = RISK_MANAGEMENT_CONFIG['base_stop_loss'] * (
-                    1 + abs(predicted_return) *
-                    RISK_MANAGEMENT_CONFIG['dynamic_stop_loss_multiplier']
-                )
+        # Update portfolio value
+        portfolio_value.append(portfolio_value[-1])
 
-                # Exit conditions
-                if (profit_loss_pct <= stop_loss or  # Stop loss hit
-                    # Take profit hit
-                    profit_loss_pct >= RISK_MANAGEMENT_CONFIG['take_profit_target'] or
-                    # Signal reversal
-                    (current_position == 1 and predicted_class == 0) or
-                        (current_position == -1 and predicted_class == 2)):
+# Calculate performance metrics
+total_return = (portfolio_value[-1] - initial_capital) / initial_capital
+winning_trades = len([t for t in trades if t.get('profit_loss', 0) > 0])
+total_trades = len(trades)
+win_rate = winning_trades / total_trades if total_trades > 0 else 0
 
-                    # Close position
-                    portfolio_value[-1] += profit_loss * position_size
-                    current_position = 0
-                    trades[-1].update({
-                        'exit_price': current_price,
-                        'profit_loss': profit_loss,
-                        'profit_loss_pct': profit_loss_pct
-                    })
+print(f"✅ Backtest Results:")
+print(f"Total Return: {total_return:.2%}")
+print(f"Win Rate: {win_rate:.2%}")
+print(f"Total Trades: {total_trades}")
 
-            # Update portfolio value
-            portfolio_value.append(portfolio_value[-1])
-
-    # Calculate performance metrics
-    total_return = (portfolio_value[-1] - initial_capital) / initial_capital
-    winning_trades = len([t for t in trades if t.get('profit_loss', 0) > 0])
-    total_trades = len(trades)
-    win_rate = winning_trades / total_trades if total_trades > 0 else 0
-
-    print(f"✅ Backtest Results:")
-    print(f"Total Return: {total_return:.2%}")
-    print(f"Win Rate: {win_rate:.2%}")
-    print(f"Total Trades: {total_trades}")
-
-    return {
-        'portfolio_value': portfolio_value,
-        'trades': trades,
-        'total_return': total_return,
-        'win_rate': win_rate,
-        'total_trades': total_trades
-    }
-
+return {
+    'portfolio_value': portfolio_value,
+    'trades': trades,
+    'total_return': total_return,
+    'win_rate': win_rate,
+    'total_trades': total_trades
+}
 
 if __name__ == "__main__":
     print("🚀 Starting SPY Trading System")
