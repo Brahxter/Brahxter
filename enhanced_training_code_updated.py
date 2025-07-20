@@ -547,11 +547,16 @@ def backtest_model(model, test_data, feature_scaler, target_scaler, initial_capi
             current_price = test_data['prices'][i]
 
             # Get model predictions
+            predicted_return = 0  # <-- Ensure this is always defined
             if model.classification:
                 reg_pred, cls_pred = model(X)
                 cls_probs = F.softmax(cls_pred, dim=1)
                 predicted_class = torch.argmax(cls_pred, dim=1).item()
                 confidence = cls_probs[0][predicted_class].item()
+                # Optionally, you can estimate predicted_return from reg_pred if needed
+                if hasattr(model, "regression_head"):
+                    predicted_return = target_scaler.inverse_transform(
+                        reg_pred.cpu().numpy().reshape(-1, 1))[0][0]
             else:
                 reg_pred = model(X)
                 predicted_return = target_scaler.inverse_transform(
@@ -559,18 +564,16 @@ def backtest_model(model, test_data, feature_scaler, target_scaler, initial_capi
                 confidence = abs(predicted_return)
 
             # Dynamic position sizing based on confidence
-            base_position_size = POSITION_SIZING_CONFIG['base_size'] * \
-                initial_capital
+            base_position_size = POSITION_SIZING_CONFIG['base_size'] * initial_capital
             position_size = min(
                 base_position_size *
-                (1 + confidence *
-                 POSITION_SIZING_CONFIG['confidence_multiplier']),
+                (1 + confidence * POSITION_SIZING_CONFIG['confidence_multiplier']),
                 initial_capital * POSITION_SIZING_CONFIG['max_position']
             )
 
             # Trading logic
             if current_position == 0:  # No position
-                if predicted_class == 2:  # Buy signal
+                if model.classification and predicted_class == 2:  # Buy signal
                     current_position = 1
                     entry_price = current_price
                     trades.append({
@@ -579,7 +582,7 @@ def backtest_model(model, test_data, feature_scaler, target_scaler, initial_capi
                         'size': position_size,
                         'confidence': confidence
                     })
-                elif predicted_class == 0:  # Short signal
+                elif model.classification and predicted_class == 0:  # Short signal
                     current_position = -1
                     entry_price = current_price
                     trades.append({
@@ -592,23 +595,19 @@ def backtest_model(model, test_data, feature_scaler, target_scaler, initial_capi
             # Position management
             elif current_position != 0:
                 current_trade = trades[-1]
-                profit_loss = (current_price -
-                               current_trade['entry_price']) * current_position
+                profit_loss = (current_price - current_trade['entry_price']) * current_position
                 profit_loss_pct = profit_loss / current_trade['entry_price']
 
                 # Dynamic stop loss
                 stop_loss = RISK_MANAGEMENT_CONFIG['base_stop_loss'] * (
-                    1 + abs(predicted_return) *
-                    RISK_MANAGEMENT_CONFIG['dynamic_stop_loss_multiplier']
+                    1 + abs(predicted_return) * RISK_MANAGEMENT_CONFIG['dynamic_stop_loss_multiplier']
                 )
 
                 # Exit conditions
                 if (profit_loss_pct <= stop_loss or  # Stop loss hit
-                    # Take profit hit
-                    profit_loss_pct >= RISK_MANAGEMENT_CONFIG['take_profit_target'] or
-                    # Signal reversal
-                    (current_position == 1 and predicted_class == 0) or
-                        (current_position == -1 and predicted_class == 2)):
+                    profit_loss_pct >= RISK_MANAGEMENT_CONFIG['take_profit_target'] or  # Take profit hit
+                    (current_position == 1 and model.classification and predicted_class == 0) or  # Signal reversal
+                    (current_position == -1 and model.classification and predicted_class == 2)):
 
                     # Close position
                     portfolio_value[-1] += profit_loss * position_size
