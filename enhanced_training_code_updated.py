@@ -617,14 +617,20 @@ print(f"✅ Backtest Results:")
 print(f"Total Return: {total_return:.2%}")
 print(f"Win Rate: {win_rate:.2%}")
 print(f"Total Trades: {total_trades}")
+plt.plot(portfolio_value)
+plt.title("Portfolio Value Over Time")  
+plt.xlabel("Time Steps")
+plt.ylabel("Portfolio Value ($)")   
 
-return {
-    'portfolio_value': portfolio_value,
-    'trades': trades,
-    'total_return': total_return,
-    'win_rate': win_rate,
-    'total_trades': total_trades
-}
+plt.savefig(f"{model_dir}/portfolio_value.png")
+plt.close()
+with open(f"{model_dir}/trades.pkl", "wb") as f:
+    pickle.dump(trades, f)
+print(f"Trades saved to {model_dir}/trades.pkl")    
+print(f"Portfolio value plot saved to {model_dir}/portfolio_value.png")
+print("🎉 Trading simulation complete!")
+
+
 
 if __name__ == "__main__":
     print("🚀 Starting SPY Trading System")
